@@ -1,0 +1,83 @@
+sudo yum update -y
+sudo yum install ruby wget -y
+cd /home/ec2-user
+wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+sudo systemctl start codedeploy-agent
+sudo systemctl enable codedeploy-agent
+sudo systemctl status codedeploy-agent
+
+sudo su - root
+mkdir deploy_dir
+cd deploy_dir
+mkdir sample_app
+cd sample_app
+vi index.html
+i enter write a content ESC :wq
+vi appspec.yml
+
+mkdir scripts
+vi httpd_install.sh
+vi httpd_start.sh
+vi httpd_stop.sh
+
+#!/bin/bash
+yum install -y httpd
+
+#!/bin/bash
+systemctl start httpd
+systemctl enable httpd
+
+#!/bin/bash
+systemctl stop httpd
+systemctl disable httpd
+
+chmod 755 *
+
+cd .. 
+
+aws deploy create-application --application-name sampleapp   (execute in sample_app folder)
+
+create bucket - version - uncheck block public
+
+aws deploy push --application-name sampleapp --s3-location s3://30072025/sampleapp.zip
+
+zip -r ../sampleapp.zip .
+
+aws s3 cp sampleapp.zip s3://30072025
+
+
+
+===========================
+version: 0.0
+os: linux
+
+files:
+  - source: /index.html
+    destination: /var/www/html/
+
+hooks:
+  BeforeInstall:
+    - location: scripts/httpd_install.sh
+      timeout: 300
+      runas: root
+
+    - location: scripts/httpd_start.sh
+      timeout: 300
+      runas: root
+
+  ApplicationStop:
+    - location: scripts/httpd_stop.sh
+      timeout: 300
+      runas: root
+
+===========================================
+#!/bin/bash
+sudo yum -y update
+sudo yum -y install ruby
+sudo yum -y install wget
+cd /home/ec2-user
+wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
+sudo chmod +x ./install
+sudo ./install auto
