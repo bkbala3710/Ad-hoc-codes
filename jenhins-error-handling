@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Stage 1 – Always Successful') {
+            steps {
+                echo "This stage will succeed"
+            }
+        }
+
+        stage('Stage 2 – May Fail but Continue') {
+            steps {
+                script {
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        echo "Running risky step..."
+                        sh 'exit 1'   // This will fail
+                    }
+                }
+            }
+        }
+
+        stage('Stage 3 – Continue Even After Failure') {
+            steps {
+                echo "This stage still runs even if Stage 2 failed!"
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                // If any stage failed, buildResult will already be FAILURE
+                if (currentBuild.result == 'FAILURE') {
+                    echo "⚠ Build completed but with errors!"
+                } else {
+                    echo "✅ Build completed successfully!"
+                }
+            }
+        }
+    }
+}
