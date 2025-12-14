@@ -1,0 +1,60 @@
+import boto3
+
+s3 = boto3.client("s3")
+
+def lambda_handler(event, context):
+    bucket_name = "terraform-import-check-21112025-renamed"   # Replace this
+    
+    size_limit = 3 * 1024 * 1024  # 3 MB in bytes
+
+    response = s3.list_objects_v2(Bucket=bucket_name)
+
+    if "Contents" not in response:
+        return {"message": "Bucket is empty"}
+
+    deleted_files = []
+
+    for obj in response["Contents"]:
+        key = obj["Key"]
+        size = obj["Size"]
+
+        if size > size_limit:
+            s3.delete_object(Bucket=bucket_name, Key=key)
+            deleted_files.append(key)
+
+    return {
+        "deleted_files": deleted_files,
+        "total_deleted": len(deleted_files)
+    }
+---
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::your-bucket-name",
+        "arn:aws:s3:::your-bucket-name/*"
+      ]
+    }
+  ]
+}
+---
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucketVersions",
+        "s3:ListBucket",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-bucket-name",
+        "arn:aws:s3:::your-bucket-name/*"
+      ]
+    }
+  ]
+}
