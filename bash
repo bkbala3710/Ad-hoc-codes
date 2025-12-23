@@ -12,6 +12,8 @@ echo "Deleted files older than 21 days from $TARGET_DIR"
 find "$TARGET_DIR" -type f -mtime +21 -exec ls -l {} \;
 
 chmod +x delete.sh
+
+# to execute
 ./delete.sh
 /path/to/delete.sh
 bash delete.sh
