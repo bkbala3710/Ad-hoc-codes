@@ -1,0 +1,76 @@
+import boto3
+from datetime import datetime, timedelta, timezone
+import os
+
+s3 = boto3.client("s3")
+sns = boto3.client("sns")
+
+SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
+BUCKET = os.environ.get("BUCKET")
+PREFIX = os.environ.get("PREFIX", "")
+
+# IST timezone
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def lambda_handler(event, context):
+
+    # ---- Current time in IST ----
+    now_ist = datetime.now(IST)
+    today_ist = datetime(now_ist.year, now_ist.month, now_ist.day, tzinfo=IST)
+
+    date_str = today_ist.strftime("%Y-%m-%d")
+    time_str = now_ist.strftime("%H:%M:%S")
+
+    # Prepare paginator once
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=BUCKET, Prefix=PREFIX)
+
+    # Collect all objects once to avoid multiple S3 scans
+    all_objects = []
+    for page in pages:
+        if "Contents" in page:
+            all_objects.extend(page["Contents"])
+
+    # ---- Count for last 7 days ----
+    daily_counts = []
+    for i in range(7):
+        day_ist = today_ist - timedelta(days=i)
+        start_utc = day_ist.astimezone(timezone.utc)
+        end_utc = (day_ist + timedelta(days=1)).astimezone(timezone.utc)
+
+        count = sum(1 for obj in all_objects if start_utc <= obj["LastModified"] < end_utc)
+        daily_counts.append({
+            "date": day_ist.strftime("%Y-%m-%d"),
+            "count": count
+        })
+
+    # Today's count
+    objects_created_today = daily_counts[0]["count"]
+
+    # Build message
+    message_lines = [
+        "Visitors Count Summary (Last 7 Days)\n",
+        f"Report generated at (IST): {date_str} {time_str}\n",
+        f"Objects created today ({date_str}): {objects_created_today}\n",
+        "\nDaily breakdown:"
+    ]
+    for entry in daily_counts:
+        message_lines.append(f"{entry['date']}: {entry['count']}")
+
+    message = "\n".join(message_lines)
+
+    # Publish email
+    sns.publish(
+        TopicArn=SNS_TOPIC_ARN,
+        Subject=f"Visitors Count | Today: {objects_created_today} | {date_str} {time_str}",
+        Message=message
+    )
+
+    return {
+        "date": date_str,
+        "time": time_str,
+        "objects_created_today": objects_created_today,
+        "last_7_days": daily_counts,
+        "email_sent": True
+    }
