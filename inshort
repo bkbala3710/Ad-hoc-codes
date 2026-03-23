@@ -1,1 +1,5 @@
-
+find /var/lib -type f -mtime +21 -delete
+find /var/lib -type f -atime +21 -delete
+chmod +x script.sh
+./script.sh
+---
